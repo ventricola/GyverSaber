@@ -29,9 +29,9 @@
 */
 
 // ---------------------------- НАСТРОЙКИ -------------------------------
-#define NUM_LEDS 30         // число МИКРОСХЕМ на ленте
+#define NUM_LEDS 50         // число МИКРОСХЕМ на ленте
 #define BTN_TIMEOUT 800     // задержка кнопки для удерживания (миллисекунды)
-#define BRIGHTNESS 255      // максимальная яркость ленты (0 - 255)
+#define BRIGHTNESS 150      // максимальная яркость ленты (0 - 255)
 
 #define SWING_TIMEOUT 500   // таймаут между двумя взмахами
 #define SWING_L_THR 150     // порог угловой скорости для взмаха
@@ -44,11 +44,11 @@
 #define BLINK_AMPL 20       // амплитуда мерцания клинка
 #define BLINK_DELAY 30      // задержка между мерцаниями
 
-#define R1 100000           // сопротивление резистора делителя    
+#define R1 99000           // сопротивление резистора делителя    
 #define R2 51000            // сопротивление резистора делителя
-#define BATTERY_SAFE 1      // не включаться и выключаться при низком заряде АКБ (1 - разрешить, 0 - запретить)
+#define BATTERY_SAFE 0      // не включаться и выключаться при низком заряде АКБ (1 - разрешить, 0 - запретить)
 
-#define DEBUG 0             // вывод в порт отладочной информации (1 - разрешить, 0 - запретить)
+#define DEBUG 1             // вывод в порт отладочной информации (1 - разрешить, 0 - запретить)
 // ---------------------------- НАСТРОЙКИ -------------------------------
 
 #define LED_PIN 6           // пин, куда подключен DIN ленты
@@ -60,7 +60,7 @@
 
 // -------------------------- БИБЛИОТЕКИ ---------------------------
 #include <avr/pgmspace.h>   // библиотека для работы с ПРОГМЕМ
-#include <SD.h>             // библиотека для работы с SD картой
+#include <SdFat.h>          // библиотека для работы с SD картой
 #include <TMRpcm.h>         // библиотека для работы с аудио
 #include "Wire.h"           // вспомогательная библиотека для работы с акселерометром
 #include "I2Cdev.h"         // вспомогательная библиотека для работы с акселерометром
@@ -68,6 +68,8 @@
 #include <toneAC.h>         // библиотека расширенной генерации звука
 #include "FastLED.h"        // библиотека для работы с адресной лентой
 #include <EEPROM.h>         // библиотека для работы с энергонезависимой памятью
+
+SdFat sd;
 
 // создание объектов
 CRGB leds[NUM_LEDS];
@@ -155,7 +157,7 @@ char BUFFER[10];
 // --------------------------------- ЗВУКИ УДАРОВ ---------------------------------
 
 void setup() {
-  FastLED.addLeds<WS2811, LED_PIN, GRB>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip );
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip );
   FastLED.setBrightness(100);  // яроксть ленты 40%
   setAll(0, 0, 0);             // ставим чёрный цвет ленты
 
@@ -188,10 +190,10 @@ void setup() {
   tmrpcm.setVolume(5);
   tmrpcm.quality(1);
   if (DEBUG) {
-    if (SD.begin(8)) Serial.println(F("SD OK"));
+    if (sd.begin(8,  SPI_FULL_SPEED)) Serial.println(F("SD OK"));
     else Serial.println(F("SD fail"));
   } else {
-    SD.begin(8);
+    sd.begin(8,  SPI_FULL_SPEED);
   }
 
   if ((EEPROM.read(0) >= 0) && (EEPROM.read(0) <= 5)) {  // если был хоть один запуск прошивки
@@ -205,7 +207,7 @@ void setup() {
 
   setColor(nowColor);                      // устанавливаем цвет клинка
   byte capacity = voltage_measure();       // получить процент заряда аккумулятора
-  capacity = map(capacity, 100, 0, (NUM_LEDS / 2 - 1), 1);  // перевести в длину клинка
+  capacity = map(capacity, 100, 0, (NUM_LEDS - 1), 1);  // перевести в длину клинка
   if (DEBUG) {
     Serial.print(F("Battery: "));
     Serial.println(capacity);
@@ -213,7 +215,7 @@ void setup() {
 
   for (char i = 0; i <= capacity; i++) {   // отобразить заряд аккумулятора как длину клинка
     setPixel(i, red, green, blue);
-    setPixel((NUM_LEDS - 1 - i), red, green, blue);
+    //setPixel((NUM_LEDS - 1 - i), red, green, blue);
     FastLED.show();
     delay(25);
   }
@@ -462,9 +464,9 @@ void setAll(byte red, byte green, byte blue) {
 
 // плавное включение меча
 void light_up() {
-  for (char i = 0; i <= (NUM_LEDS / 2 - 1); i++) {          // включить все диоды выбранным цветом
+  for (char i = 0; i <= (NUM_LEDS - 1); i++) {          // включить все диоды выбранным цветом
     setPixel(i, red, green, blue);
-    setPixel((NUM_LEDS - 1 - i), red, green, blue);
+    //setPixel((NUM_LEDS - 1 - i), red, green, blue);
     FastLED.show();
     delay(25);
   }
@@ -472,9 +474,9 @@ void light_up() {
 
 // плавное выключение меча
 void light_down() {
-  for (char i = (NUM_LEDS / 2 - 1); i >= 0; i--) {      // выключить все диоды
+  for (char i = (NUM_LEDS - 1); i >= 0; i--) {      // выключить все диоды
     setPixel(i, 0, 0, 0);
-    setPixel((NUM_LEDS - 1 - i), 0, 0, 0);
+    //setPixel((NUM_LEDS - 1 - i), 0, 0, 0);
     FastLED.show();
     delay(25);
   }
@@ -542,7 +544,7 @@ byte voltage_measure() {
     voltage += (float)analogRead(VOLT_PIN) * 5 / 1023 * (R1 + R2) / R2;
   }
   voltage = voltage / 10;           // получаем среднее арифметическое
-  int volts = voltage / 3 * 100;    // у нас 3 банки. делим на сотку для расчёта
+  int volts = voltage / 2 * 100;    // у нас 3 банки. делим на сотку для расчёта
   if (volts > 387)
     return map(volts, 420, 387, 100, 77);
   else if ((volts <= 387) && (volts > 375) )
